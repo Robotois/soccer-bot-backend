@@ -28,16 +28,15 @@ var server = new mosca.Server(moscaSettings);
 server.on('ready', setup);
 
 server.on('clientConnected', function(client) {
-  console.log(client);
   console.log('client connected', client.id);
 });
 
 // fired when a message is received
 server.on('published', function(packet, client) {
-  const {
-    payload: { x, y },
-  } = packet;
-
+  const payloadString = packet.payload.toString();
+  if(payloadString === '{ x: 0.000, y: 0.000, rotation: 0, led: 0 }') {
+    return;
+  }
   console.log('Published', packet.topic, packet.payload.toString());
 });
 
