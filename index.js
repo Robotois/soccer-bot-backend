@@ -34,7 +34,7 @@ server.on('clientConnected', function(client) {
 // fired when a message is received
 server.on('published', function(packet, client) {
   const payloadString = packet.payload.toString();
-  if(payloadString === '{ x: 0.000, y: 0.000, rotation: 0, led: 0 }') {
+  if(payloadString === '{ x: 0.000, y: 0.000, r: 0, led: 0 , kick: 0}') {
     return;
   }
   console.log('Published', packet.topic, packet.payload.toString());
