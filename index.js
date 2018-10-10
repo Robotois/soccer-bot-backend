@@ -28,7 +28,7 @@ var server = new mosca.Server(moscaSettings);
 server.on('ready', setup);
 
 server.on('clientConnected', function(client) {
-  console.log(client);
+  //console.log(client);
   console.log('client connected', client.id);
 });
 
@@ -37,7 +37,9 @@ server.on('published', function(packet, client) {
   const {
     payload: { x, y },
   } = packet;
-
+  if ('0.000,0.000,0' === packet.payload.toString()) {
+    return;
+  }
   console.log('Published', packet.topic, packet.payload.toString());
 });
 
