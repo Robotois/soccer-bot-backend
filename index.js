@@ -37,7 +37,7 @@ server.on('published', function(packet, client) {
   const {
     payload: { x, y },
   } = packet;
-  if ('0.000,0.000,0,0,0' === packet.payload.toString()) {
+  if ('0.000,0.000,0' === packet.payload.toString()) {
     return;
   }
   console.log('Published', packet.topic, packet.payload.toString());
