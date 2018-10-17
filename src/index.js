@@ -1,5 +1,6 @@
 var mosca = require('mosca');
-const client = require('./client');
+// const client = require('./client');
+const { addConnected, removeConnected } = require('./connection-manager');
 const redis = require('redis');
 
 var ascoltatore = {
@@ -28,8 +29,13 @@ var server = new mosca.Server(moscaSettings);
 server.on('ready', setup);
 
 server.on('clientConnected', function(client) {
-  console.log(client);
   console.log('client connected', client.id);
+  addConnected(client.id);
+});
+
+server.on('clientDisconnected', function(client) {
+  console.log('client disconnected', client.id);
+  removeConnected(client.id);
 });
 
 // fired when a message is received
@@ -44,5 +50,5 @@ server.on('published', function(packet, client) {
 // fired when the mqtt server is ready
 function setup() {
   console.log('Mosca server is up and running');
-  client();
+  // client();
 }
