@@ -3,11 +3,13 @@ const mqtt = require('mqtt');
 let bots = [];
 let tablets = [];
 let availableBots = [];
-let connections = [{tabletId: 'Tablet-01', botId: 'SoccerBot-01'}];
+let connections = [];
 const client = mqtt.connect('mqtt://localhost', { clientId: 'conn-manager' });
 const botsTopic = 'bots/available';
-const requestTopic = 'connection/request';
-const resetTopic = 'connection/reset';
+
+const connectionsTopic = 'connections';
+const REQUEST_ACTION = 'request';
+const RESET_ACTION = 'reset';
 
 const addConnected = (clientId) => {
   switch (true) {
@@ -16,7 +18,7 @@ const addConnected = (clientId) => {
         bots.push(clientId);
       }
       if(connections.findIndex(conn => conn.botId === clientId) === -1) {
-        availableBots.push(clientId);
+        availableBots.push({ botId: clientId });
       }
       break;
     case clientId.includes('Tablet'):
@@ -32,7 +34,7 @@ const removeConnected = (clientId) => {
   switch (true) {
     case clientId.includes('SoccerBot'):
       bots = bots.filter(bot => bot !== clientId);
-      availableBots = availableBots.filter(bot => bot !== clientId);
+      availableBots = availableBots.filter(bot => bot.botId !== clientId);
       break;
     case clientId.includes('Tablet'):
       tablets = tablets.filter(tablet => tablet !== clientId);
@@ -48,30 +50,32 @@ const getConnection = (connObj) => {
     // if there is an active connection it will send it
     const myConn = connections.find(conn => conn.tabletId === tabletId);
     if (myConn) {
-      client.publish(`${requestTopic}/${tabletId}`, JSON.stringify(myConn));
+      client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify(myConn));
     } else { // No active connection stored.
-      client.publish(`${requestTopic}/${tabletId}`, JSON.stringify({ tabletId }));
+      client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify({ tabletId }));
     }
     return;
   }
   // request for a new connection with a SoccerBot
   // if SoccerBot not available
-  if (availableBots.findIndex(item => item === botId) === -1) {
-    client.publish(`${requestTopic}/${tabletId}`, JSON.stringify({ tabletId }));
+  if (availableBots.findIndex(item => item.botId === botId) === -1) {
+    client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify({ tabletId }));
     return;
   }
   // remove SoccerBot from available
-  availableBots = availableBots.filter(item => item !== botId);
+  availableBots = availableBots.filter(item => item.botId !== botId);
   connections = connections.filter(conn => conn.tabletId !== tabletId);
   connections.push(connObj);
-  client.publish(`${requestTopic}/${tabletId}`, JSON.stringify(connObj));
+  client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify(connObj));
 }
 
-const resetConnection = ({ tabletId }) => {
+const resetConnection = (connObj) => {
+  const { tabletId } = connObj;
   const myConn = connections.find(conn => conn.tabletId === tabletId);
   if(myConn) {
-    connections.filter(conn => conn.tabletId !== tabletId);
-    availableBots.push(myConn.botId);
+    connections = connections.filter(conn => conn.tabletId !== tabletId);
+    availableBots.push({ botId: myConn.botId });
+    client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify(connObj));
   }
 }
 
@@ -79,11 +83,11 @@ client.on('message', function (topic, message) {
   // message is Buffer
   const msgObj = JSON.parse(message.toString());
   console.log(msgObj);
-  switch (topic) {
-    case requestTopic:
+  switch (msgObj.action) {
+    case REQUEST_ACTION:
       getConnection(msgObj);
       break;
-    case resetTopic:
+    case RESET_ACTION:
       resetConnection(msgObj);
       break;
     default:
@@ -95,8 +99,7 @@ const sendAvailable = () => {
 }
 
 client.on('connect', () => {
-  client.subscribe(requestTopic);
-  client.subscribe(resetTopic);
+  client.subscribe(connectionsTopic);
   setInterval(() => {
     sendAvailable();
   }, 3000);

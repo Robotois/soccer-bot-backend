@@ -11,25 +11,25 @@ function botClient() {
   client1.on('connect', function () {
     client1.subscribe(topic1);
   })
-  client1.on('message', function(topic, message) {
-    console.log(message.toString());
-  });
+  // client1.on('message', function(topic, message) {
+  //   console.log(message.toString());
+  // });
 
   client2 = mqtt.connect('mqtt://localhost', { clientId: 'SoccerBot-02' });
   client2.on('connect', function () {
     client2.subscribe(topic2);
   })
-  client2.on('message', function(topic, message) {
-    console.log(message.toString());
-  });
+  // client2.on('message', function(topic, message) {
+  //   console.log(message.toString());
+  // });
 
   client3 = mqtt.connect('mqtt://localhost', { clientId: 'SoccerBot-03' });
   client3.on('connect', function () {
     client3.subscribe(topic3);
   })
-  client3.on('message', function(topic, message) {
-    console.log(message.toString());
-  });
+  // client3.on('message', function(topic, message) {
+  //   console.log(message.toString());
+  // });
 }
 
 module.exports = botClient;

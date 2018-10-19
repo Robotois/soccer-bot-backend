@@ -1,5 +1,5 @@
 var mosca = require('mosca');
-// const client = require('./client');
+const botClient = require('./client/bot-client');
 const { addConnected, removeConnected } = require('./connection-manager');
 const redis = require('redis');
 
@@ -50,5 +50,5 @@ server.on('published', function(packet, client) {
 // fired when the mqtt server is ready
 function setup() {
   console.log('Mosca server is up and running');
-  // client();
+  botClient();
 }
