@@ -1,4 +1,5 @@
 const mqtt = require('mqtt');
+const ping = require('ping');
 
 let bots = [];
 let tablets = [];
@@ -11,20 +12,23 @@ const connectionsTopic = 'connections';
 const REQUEST_ACTION = 'request';
 const RESET_ACTION = 'reset';
 
-const addConnected = (clientId) => {
+const addConnected = (clientId, ip) => {
   switch (true) {
     case clientId.includes('SoccerBot'):
-      if(bots.findIndex(bot => bot === clientId) === -1) {
-        bots.push(clientId);
+      if(bots.findIndex(bot => bot.botId === clientId) === -1) {
+        bots.push({ botId: clientId, ip });
       }
-      if(connections.findIndex(conn => conn.botId === clientId) === -1) {
+      if (availableBots.findIndex(bot => bot.botId === clientId) === -1) {
         availableBots.push({ botId: clientId });
+        sendAvailable();
       }
+      connections = connections.filter(conn => conn.botId !== clientId);
       break;
     case clientId.includes('Tablet'):
       if(tablets.findIndex(tablet => tablet === clientId) === -1) {
         tablets.push(clientId);
       }
+      connections = connections.filter(conn => conn.tabletId == clientId);
       break;
     default:
   }
@@ -33,11 +37,14 @@ const addConnected = (clientId) => {
 const removeConnected = (clientId) => {
   switch (true) {
     case clientId.includes('SoccerBot'):
-      bots = bots.filter(bot => bot !== clientId);
+      bots = bots.filter(bot => bot.botId !== clientId);
       availableBots = availableBots.filter(bot => bot.botId !== clientId);
+      resetConnection({ botId: clientId });
+      sendAvailable();
       break;
     case clientId.includes('Tablet'):
       tablets = tablets.filter(tablet => tablet !== clientId);
+      resetConnection({ tabletId: clientId });
       break;
     default:
   }
@@ -45,44 +52,97 @@ const removeConnected = (clientId) => {
 
 const getConnection = (connObj) => {
   const { tabletId, botId } = connObj;
-  // request for active connection,
-  if (botId == undefined) {
-    // if there is an active connection it will send it
-    const myConn = connections.find(conn => conn.tabletId === tabletId);
-    if (myConn) {
-      client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify(myConn));
-    } else { // No active connection stored.
+  const myBot = availableBots.findIndex(item => item.botId === botId);
+  connections = connections.filter(item => item.tabletId !== tabletId);
+  let bot;
+  if (myBot !== -1) {
+    bot = bots.find(b => b.botId == botId);
+    pingBot(bot).then(() => {
+      // remove SoccerBot from available
+      connections.push({ ...connObj });
+      availableBots = availableBots.filter(item => item.botId !== botId);
+      client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify(connObj));
+      sendAvailable();
+    }).catch(() => {
       client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify({ tabletId }));
-    }
-    return;
+    });
+  } else {
+    availableBots = availableBots.filter(b => b.botId !== botId);
+    sendAvailable();
   }
-  // request for a new connection with a SoccerBot
-  // if SoccerBot not available
-  if (availableBots.findIndex(item => item.botId === botId) === -1) {
-    client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify({ tabletId }));
-    return;
+};
+
+const removeTabletConnection = (tabletId) => {
+  const conn = connections.find(c => c.tabletId === tabletId);
+  const myBot = conn ? bots.find(bot => bot.botId === conn.botId) : undefined;
+
+  if(myBot) {
+    availableBots = availableBots.filter(b => b.botId !== myBot.botId);
+    pingBot(myBot)
+    .then(() => {
+      availableBots.push({ botId: myBot.botId});
+      connections = connections.filter(item => item.tabletId !== tabletId);
+      client.publish(
+        `${connectionsTopic}/${tabletId}`,
+        JSON.stringify({ tabletId })
+      );
+      sendAvailable();
+    });
+  } else {
+    client.publish(
+      `${connectionsTopic}/${tabletId}`,
+      JSON.stringify({ tabletId })
+    );
+    sendAvailable();
   }
-  // remove SoccerBot from available
-  availableBots = availableBots.filter(item => item.botId !== botId);
-  connections = connections.filter(conn => conn.tabletId !== tabletId);
-  connections.push(connObj);
-  client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify(connObj));
+}
+
+const removeBotConnection = (botId) => {
+  const conn = connections.find(c => c.botId === botId);
+  if (conn) {
+    connections = connections.filter(c => c.botId !== botId);
+    client.publish(
+      `${connectionsTopic}/${conn.tabletId}`,
+      JSON.stringify({ tabletId: conn.tabletId })
+    );
+  }
 }
 
 const resetConnection = (connObj) => {
-  const { tabletId } = connObj;
-  const myConn = connections.find(conn => conn.tabletId === tabletId);
-  if(myConn) {
-    connections = connections.filter(conn => conn.tabletId !== tabletId);
-    availableBots.push({ botId: myConn.botId });
-    client.publish(`${connectionsTopic}/${tabletId}`, JSON.stringify(connObj));
+  const { tabletId, botId } = connObj;
+
+  if (tabletId) {
+    removeTabletConnection(tabletId);
+    return;
+  }
+
+  if (botId){
+    removeBotConnection(botId);
   }
 }
 
+const cfg = {
+  timeout: 2,
+  min_reply: 1,
+}
+
+const pingBot = (bot) => new Promise((resolve, reject) => {
+  ping.sys.probe(bot.ip, (isAlive) => {
+    if(isAlive) {
+      console.log(`${bot.botId} Its Alive!`);
+      resolve(true);
+    } else {
+      availableBots = availableBots.filter(b => b.botId !== bot.botId);
+      bots = bots.filter(b => b.botId !== bot.botId);
+      sendAvailable();
+      console.log(`***Disconnected bot: ${bot.id}`);
+      reject();
+    }
+  }, cfg);
+});
+
 client.on('message', function (topic, message) {
-  // message is Buffer
   const msgObj = JSON.parse(message.toString());
-  console.log(msgObj);
   switch (msgObj.action) {
     case REQUEST_ACTION:
       getConnection(msgObj);
@@ -102,7 +162,7 @@ client.on('connect', () => {
   client.subscribe(connectionsTopic);
   setInterval(() => {
     sendAvailable();
-  }, 3000);
+  }, 5000);
 });
 
 module.exports = {
