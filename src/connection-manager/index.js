@@ -39,11 +39,12 @@ const removeConnected = (clientId) => {
     case clientId.includes('SoccerBot'):
       bots = bots.filter(bot => bot.botId !== clientId);
       availableBots = availableBots.filter(bot => bot.botId !== clientId);
+      resetConnection({ botId: clientId });
       sendAvailable();
       break;
     case clientId.includes('Tablet'):
       tablets = tablets.filter(tablet => tablet !== clientId);
-      connections = connections.filter(conn => conn.tabletId !== clientId);
+      resetConnection({ tabletId: clientId });
       break;
     default:
   }
@@ -101,7 +102,7 @@ const removeBotConnection = (botId) => {
   if (conn) {
     connections = connections.filter(c => c.botId !== botId);
     client.publish(
-      `${connectionsTopic}/${tabletId}`,
+      `${connectionsTopic}/${conn.tabletId}`,
       JSON.stringify({ tabletId: conn.tabletId })
     );
   }
