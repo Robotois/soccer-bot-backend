@@ -123,7 +123,7 @@ const resetConnection = (connObj) => {
 
 const cfg = {
   timeout: 2,
-  min_reply: 1,
+  min_reply: 2,
 }
 
 const pingBot = (bot) => new Promise((resolve, reject) => {
@@ -135,7 +135,7 @@ const pingBot = (bot) => new Promise((resolve, reject) => {
       availableBots = availableBots.filter(b => b.botId !== bot.botId);
       bots = bots.filter(b => b.botId !== bot.botId);
       sendAvailable();
-      console.log(`***Disconnected bot: ${bot.id}`);
+      console.log(`***Disconnected bot: ${bot.botId}`);
       reject();
     }
   }, cfg);
