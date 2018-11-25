@@ -162,7 +162,7 @@ client.on('connect', () => {
   client.subscribe(connectionsTopic);
   setInterval(() => {
     sendAvailable();
-  }, 5000);
+  }, 3000);
 });
 
 module.exports = {
